@@ -13,8 +13,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-const workTime time.Duration = time.Minute * 5
-const breakTime time.Duration = time.Minute * 25
+const workTime time.Duration = time.Minute * 25
+const breakTime time.Duration = time.Minute * 5
 
 type model struct {
 	textInput textinput.Model
