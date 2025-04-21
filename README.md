@@ -21,6 +21,7 @@ A minimalist terminal-based Pomodoro timer written in Go using [Bubble Tea](http
 ```bash
 git clone https://github.com/lukeramljak/pomodoro
 cd pomodoro
+go mod tidy
 go run ./cmd/main
 ```
 
