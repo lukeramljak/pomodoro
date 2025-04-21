@@ -21,12 +21,13 @@ var workSpinner = spinner.Jump
 var breakSpinner = spinner.Dot
 
 type model struct {
-	spinner  spinner.Model
-	timer    timer.Model
-	keymap   keymap
-	help     help.Model
-	quitting bool
-	isBreak  bool
+	spinner        spinner.Model
+	timer          timer.Model
+	keymap         keymap
+	help           help.Model
+	quitting       bool
+	isBreak        bool
+	containerStyle lipgloss.Style
 }
 
 type keymap struct {
@@ -54,10 +55,10 @@ func (m model) View() string {
 		s += "Work ends in " + m.timer.View()
 	}
 
-	s += "\n"
+	s += "\n\n"
 	s += m.helpView()
 
-	return s
+	return m.containerStyle.Render(s)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -128,7 +129,9 @@ func (m model) helpView() string {
 func main() {
 	s := spinner.New()
 	s.Spinner = workSpinner
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).PaddingRight(1)
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).PaddingRight(2)
+
+	containerStyle := lipgloss.NewStyle().Padding(2)
 
 	m := model{
 		spinner: s,
@@ -151,7 +154,8 @@ func main() {
 				key.WithHelp("q", "quit"),
 			),
 		},
-		help: help.New(),
+		help:           help.New(),
+		containerStyle: containerStyle,
 	}
 	m.keymap.start.SetEnabled(false)
 
