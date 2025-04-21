@@ -12,7 +12,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-var timeout time.Duration = time.Minute * 25
+const workTime time.Duration = time.Minute * 25
+const breakTime time.Duration = time.Minute * 5
 
 type model struct {
 	textInput textinput.Model
@@ -20,6 +21,7 @@ type model struct {
 	keymap    keymap
 	help      help.Model
 	quitting  bool
+	isBreak   bool
 }
 
 type keymap struct {
@@ -29,9 +31,77 @@ type keymap struct {
 	quit  key.Binding
 }
 
+func (m model) Init() tea.Cmd {
+	return m.timer.Init()
+}
+
+func (m model) View() string {
+	s := m.timer.View()
+
+	if !m.isBreak {
+		s = "Work ends in " + m.timer.View()
+	} else {
+		s = "Break ends in " + m.timer.View()
+	}
+
+	s += "\n"
+	s += m.helpView()
+
+	return s
+}
+
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case timer.TickMsg:
+		var cmd tea.Cmd
+		m.timer, cmd = m.timer.Update(msg)
+		return m, cmd
+
+	case timer.StartStopMsg:
+		var cmd tea.Cmd
+		m.timer, cmd = m.timer.Update(msg)
+		m.keymap.stop.SetEnabled(m.timer.Running())
+		m.keymap.start.SetEnabled(!m.timer.Running())
+		return m, cmd
+
+	case timer.TimeoutMsg:
+		if m.isBreak {
+			m.isBreak = false
+			m.timer.Timeout = workTime
+			return m, m.timer.Start()
+		}
+
+		m.isBreak = true
+		m.timer.Timeout = breakTime
+		return m, m.timer.Start()
+
+	case tea.KeyMsg:
+		switch {
+		case key.Matches(msg, m.keymap.quit):
+			m.quitting = true
+			return m, tea.Quit
+		case key.Matches(msg, m.keymap.reset):
+			m.timer.Timeout = workTime
+		case key.Matches(msg, m.keymap.start, m.keymap.stop):
+			return m, m.timer.Toggle()
+		}
+	}
+
+	return m, nil
+}
+
+func (m model) helpView() string {
+	return "\n" + m.help.ShortHelpView([]key.Binding{
+		m.keymap.start,
+		m.keymap.stop,
+		m.keymap.reset,
+		m.keymap.quit,
+	})
+}
+
 func main() {
 	m := model{
-		timer: timer.NewWithInterval(timeout, time.Second),
+		timer: timer.NewWithInterval(workTime, time.Second),
 		keymap: keymap{
 			start: key.NewBinding(
 				key.WithKeys("s"),
@@ -58,65 +128,4 @@ func main() {
 		fmt.Println("Uh oh, we encountered an error:", err)
 		os.Exit(1)
 	}
-}
-
-func (m model) Init() tea.Cmd {
-	return m.timer.Init()
-}
-
-func (m model) View() string {
-	s := m.timer.View()
-
-	if m.timer.Timedout() {
-		s = "Break time!"
-	}
-	s += "\n"
-	if !m.quitting {
-		s = "Break time in " + s
-		s += m.helpView()
-	}
-
-	return s
-}
-
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case timer.TickMsg:
-		var cmd tea.Cmd
-		m.timer, cmd = m.timer.Update(msg)
-		return m, cmd
-
-	case timer.StartStopMsg:
-		var cmd tea.Cmd
-		m.timer, cmd = m.timer.Update(msg)
-		m.keymap.stop.SetEnabled(m.timer.Running())
-		m.keymap.start.SetEnabled(!m.timer.Running())
-		return m, cmd
-
-	case timer.TimeoutMsg:
-		m.quitting = true
-		return m, tea.Quit
-
-	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, m.keymap.quit):
-			m.quitting = true
-			return m, tea.Quit
-		case key.Matches(msg, m.keymap.reset):
-			m.timer.Timeout = timeout
-		case key.Matches(msg, m.keymap.start, m.keymap.stop):
-			return m, m.timer.Toggle()
-		}
-	}
-
-	return m, nil
-}
-
-func (m model) helpView() string {
-	return "\n" + m.help.ShortHelpView([]key.Binding{
-		m.keymap.start,
-		m.keymap.stop,
-		m.keymap.reset,
-		m.keymap.quit,
-	})
 }
