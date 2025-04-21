@@ -4,6 +4,8 @@
 
 A minimalist terminal-based Pomodoro timer written in Go using [Bubble Tea](https://github.com/charmbracelet/bubbletea). Automatically switches between work and break sessions, and supports macOS notifications and sound.
 
+![Screenshot](screenshot.png)
+
 ## Features
 
 - Work (25 min) and break (5 min) timers
