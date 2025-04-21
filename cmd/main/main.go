@@ -8,21 +8,25 @@ import (
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const workTime time.Duration = time.Minute * 25
 const breakTime time.Duration = time.Minute * 5
 
+var workSpinner = spinner.Jump
+var breakSpinner = spinner.Dot
+
 type model struct {
-	textInput textinput.Model
-	timer     timer.Model
-	keymap    keymap
-	help      help.Model
-	quitting  bool
-	isBreak   bool
+	spinner  spinner.Model
+	timer    timer.Model
+	keymap   keymap
+	help     help.Model
+	quitting bool
+	isBreak  bool
 }
 
 type keymap struct {
@@ -33,16 +37,21 @@ type keymap struct {
 }
 
 func (m model) Init() tea.Cmd {
-	return m.timer.Init()
+	return tea.Batch(
+		m.timer.Init(),
+		m.spinner.Tick,
+	)
 }
 
 func (m model) View() string {
-	s := m.timer.View()
+	var s string
 
-	if !m.isBreak {
-		s = "Work ends in " + m.timer.View()
+	s = m.spinner.View()
+
+	if m.isBreak {
+		s += "Break ends in " + m.timer.View()
 	} else {
-		s = "Break ends in " + m.timer.View()
+		s += "Work ends in " + m.timer.View()
 	}
 
 	s += "\n"
@@ -53,6 +62,11 @@ func (m model) View() string {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
+
 	case timer.TickMsg:
 		var cmd tea.Cmd
 		m.timer, cmd = m.timer.Update(msg)
@@ -72,15 +86,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.isBreak = false
 			m.timer.Timeout = workTime
+			m.spinner.Spinner = workSpinner
 		} else {
 			notify("Break time!", "Time to stretch and relax")
 			playSound("Glass")
 
 			m.isBreak = true
 			m.timer.Timeout = breakTime
+			m.spinner.Spinner = breakSpinner
 		}
 
-		return m, m.timer.Start()
+		return m, tea.Batch(m.timer.Start(), m.spinner.Tick)
 
 	case tea.KeyMsg:
 		switch {
@@ -88,7 +104,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 		case key.Matches(msg, m.keymap.reset):
+			m.isBreak = false
+			m.spinner.Spinner = workSpinner
 			m.timer.Timeout = workTime
+			return m, tea.Batch(m.timer.Start(), m.spinner.Tick)
 		case key.Matches(msg, m.keymap.start, m.keymap.stop):
 			return m, m.timer.Toggle()
 		}
@@ -107,8 +126,13 @@ func (m model) helpView() string {
 }
 
 func main() {
+	s := spinner.New()
+	s.Spinner = workSpinner
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).PaddingRight(1)
+
 	m := model{
-		timer: timer.NewWithInterval(workTime, time.Second),
+		spinner: s,
+		timer:   timer.NewWithInterval(workTime, time.Second),
 		keymap: keymap{
 			start: key.NewBinding(
 				key.WithKeys("s"),
