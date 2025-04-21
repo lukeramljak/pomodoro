@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -12,8 +13,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-const workTime time.Duration = time.Minute * 25
-const breakTime time.Duration = time.Minute * 5
+const workTime time.Duration = time.Second * 5
+const breakTime time.Duration = time.Second * 5
 
 type model struct {
 	textInput textinput.Model
@@ -66,13 +67,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case timer.TimeoutMsg:
 		if m.isBreak {
+			notify("Back to work!", "Sorry!")
+			playSound("Submarine")
+
 			m.isBreak = false
 			m.timer.Timeout = workTime
-			return m, m.timer.Start()
+		} else {
+			notify("Break time!", "Time to stretch and relax")
+			playSound("Glass")
+
+			m.isBreak = true
+			m.timer.Timeout = breakTime
 		}
 
-		m.isBreak = true
-		m.timer.Timeout = breakTime
 		return m, m.timer.Start()
 
 	case tea.KeyMsg:
@@ -128,4 +135,16 @@ func main() {
 		fmt.Println("Uh oh, we encountered an error:", err)
 		os.Exit(1)
 	}
+}
+
+func notify(title, message string) {
+	cmd := exec.Command("osascript", "-e",
+		`display notification "`+message+`" with title "`+title+`"`,
+	)
+	_ = cmd.Run()
+}
+
+func playSound(name string) {
+	path := "/System/Library/Sounds/" + name + ".aiff"
+	_ = exec.Command("afplay", path).Run()
 }
